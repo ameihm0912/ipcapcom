@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-type Config struct {
+type config struct {
 	General struct {
 		ListenPort  string
 		StaticDir   string
@@ -24,7 +24,7 @@ type Config struct {
 	}
 }
 
-var cfg Config
+var cfg config
 
 type applyEntry struct {
 	ipAddress net.IP
