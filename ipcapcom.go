@@ -66,6 +66,8 @@ func getClientIP(req *http.Request) (net.IP, error) {
 }
 
 func handlePurge(rw http.ResponseWriter, req *http.Request) {
+	listLock.Lock()
+	defer listLock.Unlock()
 	pr := purgeResponse{Success: true}
 
 	cip, err := getClientIP(req)
@@ -73,7 +75,6 @@ func handlePurge(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, err.Error(), 500)
 		return
 	}
-	listLock.Lock()
 	newlist := make([]applyEntry, 0)
 	for _, x := range applyList {
 		if cip.Equal(x.ipAddress) {
@@ -88,7 +89,6 @@ func handlePurge(rw http.ResponseWriter, req *http.Request) {
 		newlist = append(newlist, x)
 	}
 	applyList = newlist
-	listLock.Unlock()
 
 	buf, err := json.Marshal(pr)
 	if err != nil {
@@ -101,6 +101,8 @@ func handlePurge(rw http.ResponseWriter, req *http.Request) {
 }
 
 func handlePing(rw http.ResponseWriter, req *http.Request) {
+	listLock.Lock()
+	defer listLock.Unlock()
 	pr := pingResponse{Valid: true, NoState: true}
 
 	cip, err := getClientIP(req)
@@ -108,7 +110,6 @@ func handlePing(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, err.Error(), 500)
 		return
 	}
-	listLock.Lock()
 	for _, x := range applyList {
 		if cip.Equal(x.ipAddress) {
 			pr.NoState = false
@@ -116,7 +117,6 @@ func handlePing(rw http.ResponseWriter, req *http.Request) {
 			break
 		}
 	}
-	listLock.Unlock()
 
 	buf, err := json.Marshal(pr)
 	if err != nil {
@@ -129,6 +129,8 @@ func handlePing(rw http.ResponseWriter, req *http.Request) {
 }
 
 func handleApply(rw http.ResponseWriter, req *http.Request) {
+	listLock.Lock()
+	defer listLock.Unlock()
 	req.ParseMultipartForm(10000)
 
 	authtok := req.FormValue("authtoken")
@@ -159,7 +161,6 @@ func handleApply(rw http.ResponseWriter, req *http.Request) {
 		http.Error(rw, err.Error(), 500)
 		return
 	}
-	listLock.Lock()
 	ne := applyEntry{}
 	ne.ipAddress = cip
 	ne.expireAt = time.Now().Add(dur)
@@ -170,7 +171,6 @@ func handleApply(rw http.ResponseWriter, req *http.Request) {
 	}
 
 	applyList = append(applyList, ne)
-	listLock.Unlock()
 	fmt.Fprintf(os.Stdout, "add state %v\n", ne)
 
 	rw.Header().Set("Content-Type", "application/json")
