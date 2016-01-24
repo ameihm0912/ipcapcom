@@ -131,6 +131,11 @@ func handlePing(rw http.ResponseWriter, req *http.Request) {
 func handleApply(rw http.ResponseWriter, req *http.Request) {
 	req.ParseMultipartForm(10000)
 
+	authtok := req.FormValue("authtoken")
+	if authtok != cfg.General.AuthToken {
+		http.Error(rw, "auth token invalid", 401)
+		return
+	}
 	durval := req.FormValue("duration")
 	if durval == "" {
 		http.Error(rw, "no duration specified", 500)
