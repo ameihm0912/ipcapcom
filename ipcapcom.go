@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -31,9 +32,6 @@ type applyEntry struct {
 	expireAt  time.Time
 }
 
-func (a *applyEntry) expire() {
-}
-
 var applyList []applyEntry
 var listLock sync.Mutex
 
@@ -49,6 +47,11 @@ type pingResponse struct {
 	NoState bool      `json:"no_state"`
 	Valid   bool      `json:"valid"`
 	Expires time.Time `json:"expires"`
+}
+
+func runScript(a applyEntry, mode string) error {
+	c := exec.Command(cfg.General.ApplyScript, mode, a.ipAddress.String())
+	return c.Run()
 }
 
 func getClientIP(req *http.Request) (net.IP, error) {
@@ -75,6 +78,11 @@ func handlePurge(rw http.ResponseWriter, req *http.Request) {
 	for _, x := range applyList {
 		if cip.Equal(x.ipAddress) {
 			fmt.Fprintf(os.Stdout, "purge %v\n", x)
+			err = runScript(x, "purge")
+			if err != nil {
+				http.Error(rw, err.Error(), 500)
+				return
+			}
 			continue
 		}
 		newlist = append(newlist, x)
@@ -150,6 +158,11 @@ func handleApply(rw http.ResponseWriter, req *http.Request) {
 	ne := applyEntry{}
 	ne.ipAddress = cip
 	ne.expireAt = time.Now().Add(dur)
+	err = runScript(ne, "apply")
+	if err != nil {
+		http.Error(rw, err.Error(), 500)
+		return
+	}
 
 	applyList = append(applyList, ne)
 	listLock.Unlock()
@@ -168,7 +181,7 @@ func reaper() {
 			n := time.Now()
 			if n.After(x.expireAt) {
 				fmt.Fprintf(os.Stdout, "remove %v\n", x)
-				x.expire()
+				runScript(x, "purge")
 			} else {
 				newlist = append(newlist, x)
 			}
